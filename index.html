@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark" />
+  <title>Twitch Vertical View</title>
+  <style>
+    :root {
+      --bg: #0e0e10;
+      --panel: #18181b;
+      --panel-2: #242429;
+      --text: #efeff1;
+      --muted: #adadb8;
+      --accent: #9147ff;
+      --accent-2: #772ce8;
+      --line: #2f2f35;
+      --toolbar-h: 44px;
+      --main-row: 42fr;
+      --sub-row: 27fr;
+      --chat-row: 31fr;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); }
+    body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, select { font: inherit; }
+
+    .app {
+      width: 100vw;
+      height: 100dvh;
+      display: grid;
+      grid-template-rows: var(--toolbar-h) minmax(0, 1fr);
+      background: var(--bg);
+    }
+
+    .toolbar {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 7px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(24, 24, 27, 0.98);
+      z-index: 10;
+    }
+
+    .brand {
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+      margin-right: auto;
+      color: var(--muted);
+    }
+
+    .tool-btn {
+      height: 32px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 0 10px;
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .tool-btn:hover { border-color: #55545f; background: #2d2d33; }
+    .tool-btn.primary { border-color: var(--accent); background: var(--accent-2); }
+    .tool-btn.primary:hover { background: var(--accent); }
+
+    .layout {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: var(--main-row) var(--sub-row) var(--chat-row);
+      gap: 2px;
+      padding: 2px;
+      background: #000;
+    }
+
+    .row { min-width: 0; min-height: 0; display: grid; gap: 2px; }
+    .row.one { grid-template-columns: minmax(0, 1fr); }
+    .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .slot {
+      min-width: 0;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+      background: #000;
+    }
+
+    .slot iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #000;
+    }
+
+    .empty {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      text-align: center;
+      color: var(--muted);
+      background: radial-gradient(circle at center, #222228 0%, #0e0e10 70%);
+    }
+
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      background: rgba(0, 0, 0, .64);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .18s ease;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed;
+      top: 0;
+      right: 0;
+      z-index: 31;
+      width: min(440px, 94vw);
+      height: 100dvh;
+      overflow-y: auto;
+      padding: 18px;
+      background: #18181b;
+      border-left: 1px solid var(--line);
+      transform: translateX(101%);
+      transition: transform .18s ease;
+      box-shadow: -20px 0 50px rgba(0, 0, 0, .35);
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-head { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .drawer-head h2 { margin: 0; font-size: 18px; }
+    .drawer-head .tool-btn { margin-left: auto; }
+
+    .field { display: grid; gap: 6px; margin-bottom: 12px; }
+    .field label { font-size: 12px; font-weight: 800; color: var(--muted); }
+    .field input, .field select {
+      width: 100%;
+      height: 42px;
+      border: 1px solid #3a3a42;
+      border-radius: 8px;
+      padding: 0 11px;
+      background: #0e0e10;
+      color: var(--text);
+      outline: none;
+    }
+    .field input:focus, .field select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(145,71,255,.22); }
+
+    .grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .drawer-actions { display: flex; gap: 8px; margin-top: 18px; }
+    .drawer-actions .tool-btn { flex: 1; height: 42px; }
+
+    .hint {
+      margin: 14px 0 0;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: #111114;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .hint strong { color: var(--text); }
+    .warning { color: #ffcc66; }
+
+    .first-run {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(0,0,0,.78);
+    }
+    .first-run.open { display: grid; }
+    .first-run-card {
+      width: min(540px, 100%);
+      max-height: 92dvh;
+      overflow-y: auto;
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 25px 70px rgba(0,0,0,.5);
+    }
+    .first-run-card h1 { margin: 0 0 5px; font-size: 22px; }
+    .first-run-card p { margin: 0 0 18px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+
+    .size-badge {
+      position: fixed;
+      left: 8px;
+      bottom: 8px;
+      z-index: 12;
+      display: none;
+      padding: 5px 7px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.72);
+      color: #ffcc66;
+      font-size: 11px;
+      pointer-events: none;
+    }
+    .size-badge.show { display: block; }
+
+    @media (max-width: 720px) {
+      :root { --toolbar-h: 40px; }
+      .brand { display: none; }
+      .toolbar { justify-content: flex-end; }
+      .tool-btn { padding: 0 8px; font-size: 12px; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    @media (display-mode: fullscreen) {
+      .toolbar.auto-hide { position: absolute; top: 0; left: 0; right: 0; opacity: .08; transition: opacity .15s; }
+      .toolbar.auto-hide:hover { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="toolbar" id="toolbar">
+      <div class="brand">Twitch Vertical View</div>
+      <button class="tool-btn" id="swap12" type="button" title="①と②を入れ替え">①↔②</button>
+      <button class="tool-btn" id="swap13" type="button" title="①と③を入れ替え">①↔③</button>
+      <button class="tool-btn" id="fullscreenBtn" type="button">全画面</button>
+      <button class="tool-btn primary" id="settingsBtn" type="button">設定</button>
+    </header>
+
+    <section class="layout" id="layout" aria-label="Twitch multi-view layout">
+      <div class="row one">
+        <div class="slot" id="video1"></div>
+      </div>
+      <div class="row two">
+        <div class="slot" id="video2"></div>
+        <div class="slot" id="video3"></div>
+      </div>
+      <div class="row two">
+        <div class="slot" id="chatLeft"></div>
+        <div class="slot" id="chatRight"></div>
+      </div>
+    </section>
+  </main>
+
+  <div class="drawer-backdrop" id="drawerBackdrop"></div>
+  <aside class="drawer" id="drawer" aria-label="設定">
+    <div class="drawer-head">
+      <h2>表示設定</h2>
+      <button class="tool-btn" id="closeDrawer" type="button">閉じる</button>
+    </div>
+
+    <div class="field">
+      <label for="channel1">Twitch ①（メイン）</label>
+      <input id="channel1" autocomplete="off" placeholder="例: twitchdev または Twitch URL" />
+    </div>
+    <div class="field">
+      <label for="channel2">Twitch ②</label>
+      <input id="channel2" autocomplete="off" placeholder="例: channel_name" />
+    </div>
+    <div class="field">
+      <label for="channel3">Twitch ③</label>
+      <input id="channel3" autocomplete="off" placeholder="例: channel_name" />
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="chatLeftSelect">左コメント</label>
+        <select id="chatLeftSelect">
+          <option value="1">①のコメント</option>
+          <option value="2">②のコメント</option>
+          <option value="3">③のコメント</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="chatRightSelect">右コメント</label>
+        <select id="chatRightSelect">
+          <option value="1">①のコメント</option>
+          <option value="2">②のコメント</option>
+          <option value="3">③のコメント</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="drawer-actions">
+      <button class="tool-btn" id="resetBtn" type="button">保存を消去</button>
+      <button class="tool-btn primary" id="applyBtn" type="button">保存して反映</button>
+    </div>
+
+    <div class="hint">
+      <strong>使い方:</strong> チャンネル名か Twitch のチャンネルURLを入力。設定はこの端末のブラウザに保存されます。<br><br>
+      ①は音声あり、②③は初期ミュートです。上の <strong>①↔② / ①↔③</strong> でメイン表示を入れ替えられます。
+      <div id="widthWarning" class="warning" style="margin-top:8px"></div>
+    </div>
+  </aside>
+
+  <section class="first-run" id="firstRun" aria-label="初期設定">
+    <div class="first-run-card">
+      <h1>最初に3配信を設定</h1>
+      <p>チャンネル名、または <code>https://www.twitch.tv/...</code> のURLを入力してください。あとから右上の「設定」で変更できます。</p>
+
+      <div class="field">
+        <label for="first1">Twitch ①（メイン）</label>
+        <input id="first1" autocomplete="off" placeholder="例: twitchdev" />
+      </div>
+      <div class="field">
+        <label for="first2">Twitch ②</label>
+        <input id="first2" autocomplete="off" placeholder="例: channel_name" />
+      </div>
+      <div class="field">
+        <label for="first3">Twitch ③</label>
+        <input id="first3" autocomplete="off" placeholder="例: channel_name" />
+      </div>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="firstChatLeft">左コメント</label>
+          <select id="firstChatLeft">
+            <option value="1">①のコメント</option>
+            <option value="2">②のコメント</option>
+            <option value="3">③のコメント</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="firstChatRight">右コメント</label>
+          <select id="firstChatRight">
+            <option value="1">①のコメント</option>
+            <option value="2" selected>②のコメント</option>
+            <option value="3">③のコメント</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="tool-btn primary" id="startBtn" type="button" style="width:100%; height:44px">視聴開始</button>
+      <div id="firstError" class="warning" style="min-height:18px; margin-top:10px; font-size:12px"></div>
+    </div>
+  </section>
+
+  <div class="size-badge" id="sizeBadge"></div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const STORAGE_KEY = 'twitchVerticalView.config.v1';
+      const $ = (id) => document.getElementById(id);
+
+      const defaultConfig = {
+        channels: ['', '', ''],
+        chatLeft: '1',
+        chatRight: '2'
+      };
+
+      let config = loadConfig();
+
+      function normalizeChannel(value) {
+        let v = String(value || '').trim();
+        if (!v) return '';
+
+        // URL・@付き・末尾スラッシュを許容
+        v = v.replace(/^@/, '');
+        try {
+          if (/^https?:\/\//i.test(v)) {
+            const url = new URL(v);
+            if (/(^|\.)twitch\.tv$/i.test(url.hostname)) {
+              const firstPath = url.pathname.split('/').filter(Boolean)[0] || '';
+              v = firstPath;
+            }
+          }
+        } catch (_) {}
+
+        v = v.split(/[?#/]/)[0].trim().toLowerCase();
+        return /^[a-z0-9_]{2,25}$/i.test(v) ? v : '';
+      }
+
+      function loadConfig() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+          if (!saved || !Array.isArray(saved.channels)) return structuredClone(defaultConfig);
+          return {
+            channels: [0, 1, 2].map(i => normalizeChannel(saved.channels[i])),
+            chatLeft: ['1','2','3'].includes(String(saved.chatLeft)) ? String(saved.chatLeft) : '1',
+            chatRight: ['1','2','3'].includes(String(saved.chatRight)) ? String(saved.chatRight) : '2'
+          };
+        } catch (_) {
+          return structuredClone(defaultConfig);
+        }
+      }
+
+      function saveConfig() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+      }
+
+      function parentHost() {
+        return location.hostname;
+      }
+
+      function canEmbedHere() {
+        return location.protocol === 'https:' && Boolean(parentHost());
+      }
+
+      function videoUrl(channel, muted) {
+        const p = new URLSearchParams({
+          channel,
+          parent: parentHost(),
+          autoplay: 'true',
+          muted: muted ? 'true' : 'false'
+        });
+        return `https://player.twitch.tv/?${p.toString()}`;
+      }
+
+      function chatUrl(channel) {
+        const p = new URLSearchParams({ parent: parentHost() });
+        return `https://www.twitch.tv/embed/${encodeURIComponent(channel)}/chat?${p.toString()}`;
+      }
+
+      function makeIframe(src, title, allowFullscreen = false) {
+        const iframe = document.createElement('iframe');
+        iframe.src = src;
+        iframe.title = title;
+        iframe.loading = 'eager';
+        iframe.referrerPolicy = 'strict-origin-when-cross-origin';
+        iframe.allow = 'autoplay; fullscreen';
+        if (allowFullscreen) iframe.allowFullscreen = true;
+        return iframe;
+      }
+
+      function setEmpty(container, text) {
+        container.replaceChildren();
+        const div = document.createElement('div');
+        div.className = 'empty';
+        div.textContent = text;
+        container.appendChild(div);
+      }
+
+      function renderVideo(containerId, channel, muted, index) {
+        const container = $(containerId);
+        container.replaceChildren();
+        if (!channel) return setEmpty(container, `Twitch ${index} が未設定です`);
+        if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとTwitchが表示されます');
+        container.appendChild(makeIframe(videoUrl(channel, muted), `Twitch ${index}: ${channel}`, true));
+      }
+
+      function renderChat(containerId, channel, side) {
+        const container = $(containerId);
+        container.replaceChildren();
+        if (!channel) return setEmpty(container, `${side}コメントの配信が未設定です`);
+        if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとコメントが表示されます');
+        container.appendChild(makeIframe(chatUrl(channel), `${side} chat: ${channel}`));
+      }
+
+      function renderAll() {
+        renderVideo('video1', config.channels[0], false, '①');
+        renderVideo('video2', config.channels[1], true, '②');
+        renderVideo('video3', config.channels[2], true, '③');
+        renderChat('chatLeft', config.channels[Number(config.chatLeft) - 1], '左');
+        renderChat('chatRight', config.channels[Number(config.chatRight) - 1], '右');
+        syncForm();
+        updateSizeWarning();
+      }
+
+      function syncForm() {
+        $('channel1').value = config.channels[0];
+        $('channel2').value = config.channels[1];
+        $('channel3').value = config.channels[2];
+        $('chatLeftSelect').value = config.chatLeft;
+        $('chatRightSelect').value = config.chatRight;
+      }
+
+      function readDrawerConfig() {
+        return {
+          channels: [
+            normalizeChannel($('channel1').value),
+            normalizeChannel($('channel2').value),
+            normalizeChannel($('channel3').value)
+          ],
+          chatLeft: $('chatLeftSelect').value,
+          chatRight: $('chatRightSelect').value
+        };
+      }
+
+      function openDrawer() {
+        syncForm();
+        $('drawer').classList.add('open');
+        $('drawerBackdrop').classList.add('open');
+      }
+
+      function closeDrawer() {
+        $('drawer').classList.remove('open');
+        $('drawerBackdrop').classList.remove('open');
+      }
+
+      function swapChannels(a, b) {
+        [config.channels[a], config.channels[b]] = [config.channels[b], config.channels[a]];
+
+        // コメント選択は「画面番号」に追従させる
+        const sa = String(a + 1);
+        const sb = String(b + 1);
+        const swapRef = (value) => value === sa ? sb : value === sb ? sa : value;
+        config.chatLeft = swapRef(config.chatLeft);
+        config.chatRight = swapRef(config.chatRight);
+
+        saveConfig();
+        renderAll();
+      }
+
+      function updateSizeWarning() {
+        const text = window.innerWidth < 804
+          ? `現在の幅は ${window.innerWidth}px。Twitch動画は1枠あたり最低400px幅が必要なため、②③の横並びは幅804px以上を推奨します。`
+          : '';
+        $('widthWarning').textContent = text;
+        $('sizeBadge').textContent = text;
+        $('sizeBadge').classList.toggle('show', Boolean(text) && !$('drawer').classList.contains('open'));
+      }
+
+      function showFirstRunIfNeeded() {
+        if (!config.channels.some(Boolean)) $('firstRun').classList.add('open');
+      }
+
+      $('settingsBtn').addEventListener('click', openDrawer);
+      $('closeDrawer').addEventListener('click', closeDrawer);
+      $('drawerBackdrop').addEventListener('click', closeDrawer);
+
+      $('applyBtn').addEventListener('click', () => {
+        config = readDrawerConfig();
+        saveConfig();
+        renderAll();
+        closeDrawer();
+      });
+
+      $('resetBtn').addEventListener('click', () => {
+        if (!confirm('保存したチャンネル設定を消去しますか？')) return;
+        localStorage.removeItem(STORAGE_KEY);
+        config = structuredClone(defaultConfig);
+        renderAll();
+        closeDrawer();
+        $('firstRun').classList.add('open');
+      });
+
+      $('swap12').addEventListener('click', () => swapChannels(0, 1));
+      $('swap13').addEventListener('click', () => swapChannels(0, 2));
+
+      $('fullscreenBtn').addEventListener('click', async () => {
+        try {
+          if (!document.fullscreenElement) await document.documentElement.requestFullscreen();
+          else await document.exitFullscreen();
+        } catch (err) {
+          console.warn('Fullscreen unavailable:', err);
+        }
+      });
+
+      document.addEventListener('fullscreenchange', () => {
+        $('fullscreenBtn').textContent = document.fullscreenElement ? '全画面終了' : '全画面';
+        $('toolbar').classList.toggle('auto-hide', Boolean(document.fullscreenElement));
+      });
+
+      $('startBtn').addEventListener('click', () => {
+        const channels = [
+          normalizeChannel($('first1').value),
+          normalizeChannel($('first2').value),
+          normalizeChannel($('first3').value)
+        ];
+
+        if (!channels.every(Boolean)) {
+          $('firstError').textContent = '3つとも有効なTwitchチャンネル名またはURLを入力してください。';
+          return;
+        }
+
+        config = {
+          channels,
+          chatLeft: $('firstChatLeft').value,
+          chatRight: $('firstChatRight').value
+        };
+        saveConfig();
+        $('firstError').textContent = '';
+        $('firstRun').classList.remove('open');
+        renderAll();
+      });
+
+      window.addEventListener('resize', updateSizeWarning, { passive: true });
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeDrawer();
+        if (event.key.toLowerCase() === 's' && !/input|select|textarea/i.test(document.activeElement?.tagName || '')) openDrawer();
+      });
+
+      renderAll();
+      showFirstRunIfNeeded();
+    })();
+  </script>
+</body>
+</html>
