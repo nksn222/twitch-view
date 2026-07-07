@@ -71,14 +71,24 @@
       min-width: 0;
       min-height: 0;
       display: grid;
-      grid-template-rows: var(--main-row) var(--sub-row) var(--chat-row);
+      grid-template-rows: 69fr var(--chat-row);
       gap: 2px;
       padding: 2px;
       background: #000;
     }
 
+    .video-grid {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: var(--main-row) var(--sub-row);
+      gap: 2px;
+      overflow: hidden;
+      background: #000;
+    }
+
     .row { min-width: 0; min-height: 0; display: grid; gap: 2px; }
-    .row.one { grid-template-columns: minmax(0, 1fr); }
     .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
     .slot {
@@ -89,6 +99,24 @@
       background: #000;
     }
 
+    .video-tile {
+      isolation: isolate;
+      will-change: transform;
+      contain: layout paint;
+    }
+    .video-tile.pos-main { grid-column: 1 / 3; grid-row: 1; }
+    .video-tile.pos-left { grid-column: 1; grid-row: 2; }
+    .video-tile.pos-right { grid-column: 2; grid-row: 2; }
+    .video-grid.is-animating .player-host { pointer-events: none; }
+
+    .player-host {
+      position: absolute;
+      inset: 0;
+      min-width: 0;
+      min-height: 0;
+      background: #000;
+    }
+
     .slot iframe {
       display: block;
       width: 100%;
@@ -96,6 +124,31 @@
       border: 0;
       background: #000;
     }
+
+    .promote-btn {
+      position: absolute;
+      top: 7px;
+      left: 7px;
+      z-index: 4;
+      height: 30px;
+      max-width: calc(100% - 14px);
+      border: 1px solid rgba(255,255,255,.22);
+      border-radius: 7px;
+      padding: 0 9px;
+      background: rgba(14,14,16,.78);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+      backdrop-filter: blur(7px);
+      -webkit-backdrop-filter: blur(7px);
+      box-shadow: 0 2px 10px rgba(0,0,0,.28);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .promote-btn:hover { background: rgba(45,45,51,.94); border-color: rgba(255,255,255,.4); }
+    .promote-btn.is-main { background: rgba(119,44,232,.86); border-color: rgba(255,255,255,.32); cursor: default; }
 
     .empty {
       height: 100%;
@@ -233,12 +286,19 @@
     </header>
 
     <section class="layout" id="layout" aria-label="Twitch multi-view layout">
-      <div class="row one">
-        <div class="slot" id="video1"></div>
-      </div>
-      <div class="row two">
-        <div class="slot" id="video2"></div>
-        <div class="slot" id="video3"></div>
+      <div class="video-grid" id="videoGrid">
+        <div class="slot video-tile pos-main" id="videoTile1" data-video-index="0">
+          <div class="player-host" id="video1"></div>
+          <button class="promote-btn is-main" type="button" data-promote="0">① MAIN</button>
+        </div>
+        <div class="slot video-tile pos-left" id="videoTile2" data-video-index="1">
+          <div class="player-host" id="video2"></div>
+          <button class="promote-btn" type="button" data-promote="1">② メインへ</button>
+        </div>
+        <div class="slot video-tile pos-right" id="videoTile3" data-video-index="2">
+          <div class="player-host" id="video3"></div>
+          <button class="promote-btn" type="button" data-promote="2">③ メインへ</button>
+        </div>
       </div>
       <div class="row two">
         <div class="slot" id="chatLeft"></div>
@@ -293,7 +353,8 @@
 
     <div class="hint">
       <strong>使い方:</strong> チャンネル名か Twitch のチャンネルURLを入力。設定はこの端末のブラウザに保存されます。<br><br>
-      ①は音声あり、②③は初期ミュートです。上の <strong>①↔② / ①↔③</strong> でメイン表示を入れ替えられます。
+      ①は音声あり、②③は初期ミュートです。上の <strong>①↔② / ①↔③</strong>、または各映像左上のボタンで入れ替えられます。<br>
+      入れ替え時は iframe を作り直さないため、<strong>再読み込みせず再生・音量状態を維持</strong>します。
       <div id="widthWarning" class="warning" style="margin-top:8px"></div>
     </div>
   </aside>
@@ -348,20 +409,37 @@
 
       const STORAGE_KEY = 'twitchVerticalView.config.v1';
       const $ = (id) => document.getElementById(id);
+      const tileIds = ['videoTile1', 'videoTile2', 'videoTile3'];
+      const videoHostIds = ['video1', 'video2', 'video3'];
+      const positionClasses = ['pos-main', 'pos-left', 'pos-right'];
+      const circled = ['①', '②', '③'];
 
       const defaultConfig = {
         channels: ['', '', ''],
         chatLeft: '1',
-        chatRight: '2'
+        chatRight: '2',
+        // channels[i] の映像がどの位置にいるか: 0=上、1=左下、2=右下
+        positions: [0, 1, 2]
       };
 
       let config = loadConfig();
+      const renderedVideoChannels = ['', '', ''];
+      const renderedChatChannels = { left: null, right: null };
+      const runningAnimations = new Map();
+
+      function cloneDefaultConfig() {
+        return {
+          channels: [...defaultConfig.channels],
+          chatLeft: defaultConfig.chatLeft,
+          chatRight: defaultConfig.chatRight,
+          positions: [...defaultConfig.positions]
+        };
+      }
 
       function normalizeChannel(value) {
         let v = String(value || '').trim();
         if (!v) return '';
 
-        // URL・@付き・末尾スラッシュを許容
         v = v.replace(/^@/, '');
         try {
           if (/^https?:\/\//i.test(v)) {
@@ -377,17 +455,24 @@
         return /^[a-z0-9_]{2,25}$/i.test(v) ? v : '';
       }
 
+      function normalizePositions(value) {
+        if (!Array.isArray(value)) return [0, 1, 2];
+        const p = value.map(Number);
+        return p.length === 3 && [...p].sort().join(',') === '0,1,2' ? p : [0, 1, 2];
+      }
+
       function loadConfig() {
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
-          if (!saved || !Array.isArray(saved.channels)) return structuredClone(defaultConfig);
+          if (!saved || !Array.isArray(saved.channels)) return cloneDefaultConfig();
           return {
             channels: [0, 1, 2].map(i => normalizeChannel(saved.channels[i])),
             chatLeft: ['1','2','3'].includes(String(saved.chatLeft)) ? String(saved.chatLeft) : '1',
-            chatRight: ['1','2','3'].includes(String(saved.chatRight)) ? String(saved.chatRight) : '2'
+            chatRight: ['1','2','3'].includes(String(saved.chatRight)) ? String(saved.chatRight) : '2',
+            positions: normalizePositions(saved.positions)
           };
         } catch (_) {
-          return structuredClone(defaultConfig);
+          return cloneDefaultConfig();
         }
       }
 
@@ -437,28 +522,149 @@
         container.appendChild(div);
       }
 
-      function renderVideo(containerId, channel, muted, index) {
-        const container = $(containerId);
+      function renderVideo(index, force = false) {
+        const container = $(videoHostIds[index]);
+        const channel = config.channels[index];
+
+        // 同じチャンネルなら iframe に触らない = 再読み込みしない
+        if (!force && renderedVideoChannels[index] === channel && container.firstChild) return;
+
+        renderedVideoChannels[index] = channel;
         container.replaceChildren();
-        if (!channel) return setEmpty(container, `Twitch ${index} が未設定です`);
+        if (!channel) return setEmpty(container, `Twitch ${circled[index]} が未設定です`);
         if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとTwitchが表示されます');
-        container.appendChild(makeIframe(videoUrl(channel, muted), `Twitch ${index}: ${channel}`, true));
+
+        // 初回ロード時のみ ①は音声あり、②③はミュート
+        container.appendChild(makeIframe(
+          videoUrl(channel, index !== 0),
+          `Twitch ${circled[index]}: ${channel}`,
+          true
+        ));
       }
 
-      function renderChat(containerId, channel, side) {
-        const container = $(containerId);
+      function renderVideos(force = false) {
+        [0, 1, 2].forEach(i => renderVideo(i, force));
+      }
+
+      function renderChat(side, force = false) {
+        const isLeft = side === 'left';
+        const container = $(isLeft ? 'chatLeft' : 'chatRight');
+        const selected = isLeft ? config.chatLeft : config.chatRight;
+        const channel = config.channels[Number(selected) - 1];
+        const sideName = isLeft ? '左' : '右';
+
+        if (!force && renderedChatChannels[side] === channel && container.firstChild) return;
+        renderedChatChannels[side] = channel;
         container.replaceChildren();
-        if (!channel) return setEmpty(container, `${side}コメントの配信が未設定です`);
+
+        if (!channel) return setEmpty(container, `${sideName}コメントの配信が未設定です`);
         if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとコメントが表示されます');
-        container.appendChild(makeIframe(chatUrl(channel), `${side} chat: ${channel}`));
+        container.appendChild(makeIframe(chatUrl(channel), `${sideName} chat: ${channel}`));
       }
 
-      function renderAll() {
-        renderVideo('video1', config.channels[0], false, '①');
-        renderVideo('video2', config.channels[1], true, '②');
-        renderVideo('video3', config.channels[2], true, '③');
-        renderChat('chatLeft', config.channels[Number(config.chatLeft) - 1], '左');
-        renderChat('chatRight', config.channels[Number(config.chatRight) - 1], '右');
+      function renderChats(force = false) {
+        renderChat('left', force);
+        renderChat('right', force);
+      }
+
+      function updatePromoteButtons() {
+        const mainChannelIndex = config.positions.indexOf(0);
+        document.querySelectorAll('[data-promote]').forEach((button) => {
+          const index = Number(button.dataset.promote);
+          const isMain = index === mainChannelIndex;
+          button.classList.toggle('is-main', isMain);
+          button.textContent = isMain ? `${circled[index]} MAIN` : `${circled[index]} メインへ`;
+          button.title = isMain ? `${circled[index]} は現在メイン表示です` : `${circled[index]} をメイン表示へ移動`;
+          button.setAttribute('aria-pressed', String(isMain));
+        });
+      }
+
+      function applyPositions() {
+        [0, 1, 2].forEach((channelIndex) => {
+          const tile = $(tileIds[channelIndex]);
+          tile.classList.remove(...positionClasses);
+          tile.classList.add(positionClasses[config.positions[channelIndex]]);
+        });
+        updatePromoteButtons();
+      }
+
+      function tileRects() {
+        return tileIds.map(id => $(id).getBoundingClientRect());
+      }
+
+      function animatePositionChange(mutator) {
+        const before = tileRects();
+
+        mutator();
+        applyPositions();
+
+        // 新しいグリッド位置を確定させてから FLIP アニメーション
+        const after = tileRects();
+        const grid = $('videoGrid');
+        grid.classList.add('is-animating');
+
+        let longest = Promise.resolve();
+        tileIds.forEach((id, index) => {
+          const tile = $(id);
+          runningAnimations.get(tile)?.cancel();
+
+          const b = before[index];
+          const a = after[index];
+          const dx = b.left - a.left;
+          const dy = b.top - a.top;
+          const sx = a.width ? b.width / a.width : 1;
+          const sy = a.height ? b.height / a.height : 1;
+
+          if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.005 && Math.abs(sy - 1) < 0.005) return;
+
+          tile.style.zIndex = '6';
+          const animation = tile.animate([
+            {
+              transformOrigin: '0 0',
+              transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})`
+            },
+            {
+              transformOrigin: '0 0',
+              transform: 'translate(0, 0) scale(1, 1)'
+            }
+          ], {
+            duration: 300,
+            easing: 'cubic-bezier(.2,.8,.2,1)',
+            fill: 'both'
+          });
+
+          runningAnimations.set(tile, animation);
+          const finished = animation.finished.catch(() => {}).finally(() => {
+            if (runningAnimations.get(tile) === animation) runningAnimations.delete(tile);
+            tile.style.zIndex = '';
+          });
+          longest = Promise.all([longest, finished]);
+        });
+
+        longest.finally(() => grid.classList.remove('is-animating'));
+      }
+
+      function swapPositions(channelA, channelB) {
+        if (channelA === channelB) return;
+        animatePositionChange(() => {
+          [config.positions[channelA], config.positions[channelB]] = [
+            config.positions[channelB],
+            config.positions[channelA]
+          ];
+          saveConfig();
+        });
+      }
+
+      function promoteToMain(channelIndex) {
+        const currentMain = config.positions.indexOf(0);
+        if (currentMain === channelIndex) return;
+        swapPositions(currentMain, channelIndex);
+      }
+
+      function renderAll({ forceVideos = false, forceChats = false } = {}) {
+        renderVideos(forceVideos);
+        renderChats(forceChats);
+        applyPositions();
         syncForm();
         updateSizeWarning();
       }
@@ -479,7 +685,8 @@
             normalizeChannel($('channel3').value)
           ],
           chatLeft: $('chatLeftSelect').value,
-          chatRight: $('chatRightSelect').value
+          chatRight: $('chatRightSelect').value,
+          positions: [...config.positions]
         };
       }
 
@@ -487,25 +694,13 @@
         syncForm();
         $('drawer').classList.add('open');
         $('drawerBackdrop').classList.add('open');
+        updateSizeWarning();
       }
 
       function closeDrawer() {
         $('drawer').classList.remove('open');
         $('drawerBackdrop').classList.remove('open');
-      }
-
-      function swapChannels(a, b) {
-        [config.channels[a], config.channels[b]] = [config.channels[b], config.channels[a]];
-
-        // コメント選択は「画面番号」に追従させる
-        const sa = String(a + 1);
-        const sb = String(b + 1);
-        const swapRef = (value) => value === sa ? sb : value === sb ? sa : value;
-        config.chatLeft = swapRef(config.chatLeft);
-        config.chatRight = swapRef(config.chatRight);
-
-        saveConfig();
-        renderAll();
+        updateSizeWarning();
       }
 
       function updateSizeWarning() {
@@ -526,23 +721,40 @@
       $('drawerBackdrop').addEventListener('click', closeDrawer);
 
       $('applyBtn').addEventListener('click', () => {
-        config = readDrawerConfig();
+        const previous = config;
+        const next = readDrawerConfig();
+        config = next;
         saveConfig();
-        renderAll();
+
+        // 変更された映像・コメントだけ作り直す。位置は維持。
+        [0, 1, 2].forEach((i) => {
+          if (previous.channels[i] !== next.channels[i]) renderVideo(i, true);
+        });
+        renderChats(true);
+        applyPositions();
+        syncForm();
+        updateSizeWarning();
         closeDrawer();
       });
 
       $('resetBtn').addEventListener('click', () => {
         if (!confirm('保存したチャンネル設定を消去しますか？')) return;
         localStorage.removeItem(STORAGE_KEY);
-        config = structuredClone(defaultConfig);
-        renderAll();
+        config = cloneDefaultConfig();
+        renderedVideoChannels.fill('');
+        renderedChatChannels.left = null;
+        renderedChatChannels.right = null;
+        renderAll({ forceVideos: true, forceChats: true });
         closeDrawer();
         $('firstRun').classList.add('open');
       });
 
-      $('swap12').addEventListener('click', () => swapChannels(0, 1));
-      $('swap13').addEventListener('click', () => swapChannels(0, 2));
+      $('swap12').addEventListener('click', () => swapPositions(0, 1));
+      $('swap13').addEventListener('click', () => swapPositions(0, 2));
+
+      document.querySelectorAll('[data-promote]').forEach((button) => {
+        button.addEventListener('click', () => promoteToMain(Number(button.dataset.promote)));
+      });
 
       $('fullscreenBtn').addEventListener('click', async () => {
         try {
@@ -573,12 +785,13 @@
         config = {
           channels,
           chatLeft: $('firstChatLeft').value,
-          chatRight: $('firstChatRight').value
+          chatRight: $('firstChatRight').value,
+          positions: [0, 1, 2]
         };
         saveConfig();
         $('firstError').textContent = '';
         $('firstRun').classList.remove('open');
-        renderAll();
+        renderAll({ forceVideos: true, forceChats: true });
       });
 
       window.addEventListener('resize', updateSizeWarning, { passive: true });
