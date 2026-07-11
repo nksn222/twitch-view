@@ -4,7 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="dark" />
-  <title>Twitch Vertical View</title>
+  <meta name="theme-color" content="#9147ff" />
+  <meta name="application-name" content="Twitch 縦型マルチビュー" />
+  <link rel="icon" href="./favicon.svg?v=6" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.ico?v=6" sizes="any" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png?v=6" />
+  <title>Twitch 縦型マルチビュー</title>
   <style>
     :root {
       --bg: #0e0e10;
@@ -362,7 +367,7 @@
 <body>
   <main class="app">
     <header class="toolbar" id="toolbar">
-      <div class="brand">Twitch Vertical View</div>
+      <div class="brand">Twitch Vertical View v5</div>
       <div class="main-switches" aria-label="メイン画面切り替え">
         <button class="tool-btn" id="main1" type="button" data-main="0">①メイン</button>
         <button class="tool-btn" id="main2" type="button" data-main="1">②メイン</button>
@@ -471,7 +476,8 @@
     </div>
     <div class="hint">
       右上の<strong>「レイアウト編集」</strong>を押すと、映像とコメント欄を自由に移動・サイズ変更できます。<br>
-      レイアウトは<strong>2人・3人・4人ごとに別々に保存</strong>されます。
+      レイアウトは<strong>2人・3人・4人ごとに別々に保存</strong>されます。<br>
+      映像は<strong>自動再生を安定させるため、最初はミュート</strong>で始まります。音声は各プレイヤーでONにしてください。
     </div>
 
     <div class="drawer-actions">
@@ -483,7 +489,7 @@
   <section class="first-run" id="firstRun" aria-label="初期設定">
     <div class="first-run-card">
       <h1>最初に配信を設定</h1>
-      <p>2〜4人を選び、チャンネル名または Twitch URLを入力してください。あとから右上の「設定」で変更できます。</p>
+      <p>2〜4人を選び、チャンネル名または Twitch URLを入力してください。映像は自動再生され、最初はミュートで始まります。</p>
 
       <div class="field">
         <label for="firstStreamCount">同時視聴する人数</label>
@@ -540,7 +546,7 @@
       const SNAP = 1;
 
       const defaultConfig = {
-        version: 4,
+        version: 5,
         streamCount: 3,
         channels: ['', '', '', ''],
         chatLeft: '1',
@@ -682,7 +688,7 @@
           if (!Number.isInteger(mainIndex) && Array.isArray(saved.order)) mainIndex = Number(saved.order[0]);
           if (!Number.isInteger(mainIndex) || mainIndex < 0 || mainIndex >= streamCount) mainIndex = 0;
           return {
-            version: 4,
+            version: 5,
             streamCount,
             channels,
             chatLeft: normalizeChat(saved.chatLeft, streamCount, 1),
@@ -765,7 +771,7 @@
         container.replaceChildren();
         if (!channel) return setEmpty(container, `Twitch ${circled[index]} が未設定です`);
         if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとTwitchが表示されます');
-        container.appendChild(makeIframe(videoUrl(channel, index !== 0), `Twitch ${circled[index]}: ${channel}`, true));
+        container.appendChild(makeIframe(videoUrl(channel, true), `Twitch ${circled[index]}: ${channel}`, true));
       }
 
       function renderVideos(force = false) {
@@ -980,7 +986,7 @@
         const streamCount = normalizeCount($('streamCount').value);
         const channels = [0, 1, 2, 3].map((i) => normalizeChannel($(`channel${i + 1}`).value));
         return {
-          version: 4,
+          version: 5,
           streamCount,
           channels,
           chatLeft: normalizeChat($('chatLeftSelect').value, streamCount, 1),
@@ -1109,7 +1115,7 @@
           return;
         }
         config = {
-          version: 4,
+          version: 5,
           streamCount,
           channels,
           chatLeft: normalizeChat($('firstChatLeft').value, streamCount, 1),

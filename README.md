@@ -1,40 +1,22 @@
-# Twitch Vertical View
+# Twitch 縦型マルチビュー v6
 
-縦長モニター向けの自分用 Twitch 同時視聴ページです。
+GitHub Pages用のファイル一式です。
 
-レイアウト:
+## v6の変更
 
-```text
-┌──────────────────────┐
-│      Twitch ①        │
-│       大きめ         │
-├──────────┬───────────┤
-│ Twitch②  │ Twitch③   │
-├──────────┼───────────┤
-│ Chat A   │ Chat B    │
-└──────────┴───────────┘
-```
+- 紫色の「縦型マルチビュー」ファビコンを追加
+- Chromeのタブ、ブックマーク、ホーム画面で見分けやすいデザイン
+- タブタイトルを「Twitch 縦型マルチビュー」に変更
+- 自動再生、2〜4人表示、自由レイアウト、コメント2枠など従来機能はそのまま
 
-## GitHub Pages で公開
+## 更新方法
 
-1. GitHub で新しいリポジトリを作成
-2. このフォルダの `index.html` をアップロード
-3. リポジトリの **Settings** → **Pages**
-4. **Build and deployment** の Source を **Deploy from a branch**
-5. Branch を **main**、Folder を **/(root)** にして Save
-6. 表示された `https://ユーザー名.github.io/リポジトリ名/` を開く
+GitHubリポジトリで `Add file` → `Upload files` を開き、次のファイルをまとめてアップロードして `Commit changes` を押してください。
 
-## 機能
+- `index.html`
+- `favicon.svg`
+- `favicon.ico`
+- `favicon-32.png`
+- `apple-touch-icon.png`
 
-- 上段にメイン配信①
-- 中段に配信②・③
-- 下段にコメント2列
-- 左右コメントは①②③から選択
-- 設定をブラウザに保存
-- ①↔② / ①↔③ の入れ替え
-- 全画面表示
-- Twitch URL入力にも対応
-
-## 注意
-
-Twitch埋め込みは HTTPS と `parent` ドメイン指定が必要です。このページは公開先のホスト名を自動で `parent` に使うため、GitHub Pages 上で利用してください。
+GitHub Pagesへの反映後も古いファビコンが残る場合は、Chromeでページを開いて `Ctrl + Shift + R`（Macは `Command + Shift + R`）を押してください。
