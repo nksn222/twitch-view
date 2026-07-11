@@ -16,9 +16,6 @@
       --accent-2: #772ce8;
       --line: #2f2f35;
       --toolbar-h: 44px;
-      --main-row: 42fr;
-      --sub-row: 27fr;
-      --chat-row: 31fr;
     }
 
     * { box-sizing: border-box; }
@@ -43,7 +40,10 @@
       border-bottom: 1px solid var(--line);
       background: rgba(24, 24, 27, 0.98);
       z-index: 10;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
+    .toolbar::-webkit-scrollbar { display: none; }
 
     .brand {
       font-size: 12px;
@@ -52,6 +52,8 @@
       margin-right: auto;
       color: var(--muted);
     }
+
+    .main-switches { display: flex; align-items: center; gap: 4px; }
 
     .tool-btn {
       height: 32px;
@@ -66,12 +68,14 @@
     .tool-btn:hover { border-color: #55545f; background: #2d2d33; }
     .tool-btn.primary { border-color: var(--accent); background: var(--accent-2); }
     .tool-btn.primary:hover { background: var(--accent); }
+    .tool-btn.is-main { border-color: var(--accent); background: var(--accent-2); cursor: default; }
+    .tool-btn[hidden] { display: none; }
 
     .layout {
       min-width: 0;
       min-height: 0;
       display: grid;
-      grid-template-rows: 69fr var(--chat-row);
+      grid-template-rows: 69fr 31fr;
       gap: 2px;
       padding: 2px;
       background: #000;
@@ -81,11 +85,22 @@
       min-width: 0;
       min-height: 0;
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      grid-template-rows: var(--main-row) var(--sub-row);
       gap: 2px;
       overflow: hidden;
       background: #000;
+    }
+
+    .video-grid.count-2 {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1.15fr) minmax(0, .85fr);
+    }
+    .video-grid.count-3 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: minmax(0, 1.22fr) minmax(0, .78fr);
+    }
+    .video-grid.count-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: minmax(0, 1.22fr) minmax(0, .78fr) minmax(0, .78fr);
     }
 
     .row { min-width: 0; min-height: 0; display: grid; gap: 2px; }
@@ -104,9 +119,7 @@
       will-change: transform;
       contain: layout paint;
     }
-    .video-tile.pos-main { grid-column: 1 / 3; grid-row: 1; }
-    .video-tile.pos-left { grid-column: 1; grid-row: 2; }
-    .video-tile.pos-right { grid-column: 2; grid-row: 2; }
+    .video-tile[hidden] { display: none; }
     .video-grid.is-animating .player-host { pointer-events: none; }
 
     .player-host {
@@ -193,6 +206,7 @@
     .drawer-head .tool-btn { margin-left: auto; }
 
     .field { display: grid; gap: 6px; margin-bottom: 12px; }
+    .field[hidden] { display: none; }
     .field label { font-size: 12px; font-weight: 800; color: var(--muted); }
     .field input, .field select {
       width: 100%;
@@ -279,25 +293,33 @@
   <main class="app">
     <header class="toolbar" id="toolbar">
       <div class="brand">Twitch Vertical View</div>
-      <button class="tool-btn" id="swap12" type="button" title="①と②を入れ替え">①↔②</button>
-      <button class="tool-btn" id="swap13" type="button" title="①と③を入れ替え">①↔③</button>
+      <div class="main-switches" aria-label="メイン画面切り替え">
+        <button class="tool-btn" id="main1" type="button" data-main="0">①メイン</button>
+        <button class="tool-btn" id="main2" type="button" data-main="1">②メイン</button>
+        <button class="tool-btn" id="main3" type="button" data-main="2">③メイン</button>
+        <button class="tool-btn" id="main4" type="button" data-main="3">④メイン</button>
+      </div>
       <button class="tool-btn" id="fullscreenBtn" type="button">全画面</button>
       <button class="tool-btn primary" id="settingsBtn" type="button">設定</button>
     </header>
 
     <section class="layout" id="layout" aria-label="Twitch multi-view layout">
-      <div class="video-grid" id="videoGrid">
-        <div class="slot video-tile pos-main" id="videoTile1" data-video-index="0">
+      <div class="video-grid count-3" id="videoGrid">
+        <div class="slot video-tile" id="videoTile1" data-video-index="0">
           <div class="player-host" id="video1"></div>
           <button class="promote-btn is-main" type="button" data-promote="0">① MAIN</button>
         </div>
-        <div class="slot video-tile pos-left" id="videoTile2" data-video-index="1">
+        <div class="slot video-tile" id="videoTile2" data-video-index="1">
           <div class="player-host" id="video2"></div>
           <button class="promote-btn" type="button" data-promote="1">② メインへ</button>
         </div>
-        <div class="slot video-tile pos-right" id="videoTile3" data-video-index="2">
+        <div class="slot video-tile" id="videoTile3" data-video-index="2">
           <div class="player-host" id="video3"></div>
           <button class="promote-btn" type="button" data-promote="2">③ メインへ</button>
+        </div>
+        <div class="slot video-tile" id="videoTile4" data-video-index="3" hidden>
+          <div class="player-host" id="video4"></div>
+          <button class="promote-btn" type="button" data-promote="3">④ メインへ</button>
         </div>
       </div>
       <div class="row two">
@@ -315,34 +337,39 @@
     </div>
 
     <div class="field">
-      <label for="channel1">Twitch ①（メイン）</label>
+      <label for="streamCount">同時視聴する人数</label>
+      <select id="streamCount">
+        <option value="2">2人</option>
+        <option value="3">3人</option>
+        <option value="4">4人</option>
+      </select>
+    </div>
+
+    <div class="field" data-channel-field="0">
+      <label for="channel1">Twitch ①</label>
       <input id="channel1" autocomplete="off" placeholder="例: twitchdev または Twitch URL" />
     </div>
-    <div class="field">
+    <div class="field" data-channel-field="1">
       <label for="channel2">Twitch ②</label>
       <input id="channel2" autocomplete="off" placeholder="例: channel_name" />
     </div>
-    <div class="field">
+    <div class="field" data-channel-field="2">
       <label for="channel3">Twitch ③</label>
       <input id="channel3" autocomplete="off" placeholder="例: channel_name" />
+    </div>
+    <div class="field" data-channel-field="3">
+      <label for="channel4">Twitch ④</label>
+      <input id="channel4" autocomplete="off" placeholder="例: channel_name" />
     </div>
 
     <div class="grid-2">
       <div class="field">
         <label for="chatLeftSelect">左コメント</label>
-        <select id="chatLeftSelect">
-          <option value="1">①のコメント</option>
-          <option value="2">②のコメント</option>
-          <option value="3">③のコメント</option>
-        </select>
+        <select id="chatLeftSelect"></select>
       </div>
       <div class="field">
         <label for="chatRightSelect">右コメント</label>
-        <select id="chatRightSelect">
-          <option value="1">①のコメント</option>
-          <option value="2">②のコメント</option>
-          <option value="3">③のコメント</option>
-        </select>
+        <select id="chatRightSelect"></select>
       </div>
     </div>
 
@@ -352,47 +379,54 @@
     </div>
 
     <div class="hint">
-      <strong>使い方:</strong> チャンネル名か Twitch のチャンネルURLを入力。設定はこの端末のブラウザに保存されます。<br><br>
-      ①は音声あり、②③は初期ミュートです。上の <strong>①↔② / ①↔③</strong>、または各映像左上のボタンで入れ替えられます。<br>
-      入れ替え時は iframe を作り直さないため、<strong>再読み込みせず再生・音量状態を維持</strong>します。
+      <strong>配置:</strong><br>
+      2人＝① / ②<br>
+      3人＝① / ②③<br>
+      4人＝① / ②③ / ④<br><br>
+      各映像の左上か、上部のボタンを押すとメイン画面を切り替えます。iframeは作り直さないため、<strong>再読み込みせずシームレスに移動</strong>します。
       <div id="widthWarning" class="warning" style="margin-top:8px"></div>
     </div>
   </aside>
 
   <section class="first-run" id="firstRun" aria-label="初期設定">
     <div class="first-run-card">
-      <h1>最初に3配信を設定</h1>
-      <p>チャンネル名、または <code>https://www.twitch.tv/...</code> のURLを入力してください。あとから右上の「設定」で変更できます。</p>
+      <h1>最初に配信を設定</h1>
+      <p>2〜4人を選び、チャンネル名または Twitch URLを入力してください。あとから右上の「設定」で変更できます。</p>
 
       <div class="field">
-        <label for="first1">Twitch ①（メイン）</label>
+        <label for="firstStreamCount">同時視聴する人数</label>
+        <select id="firstStreamCount">
+          <option value="2">2人</option>
+          <option value="3" selected>3人</option>
+          <option value="4">4人</option>
+        </select>
+      </div>
+
+      <div class="field" data-first-channel-field="0">
+        <label for="first1">Twitch ①</label>
         <input id="first1" autocomplete="off" placeholder="例: twitchdev" />
       </div>
-      <div class="field">
+      <div class="field" data-first-channel-field="1">
         <label for="first2">Twitch ②</label>
         <input id="first2" autocomplete="off" placeholder="例: channel_name" />
       </div>
-      <div class="field">
+      <div class="field" data-first-channel-field="2">
         <label for="first3">Twitch ③</label>
         <input id="first3" autocomplete="off" placeholder="例: channel_name" />
+      </div>
+      <div class="field" data-first-channel-field="3">
+        <label for="first4">Twitch ④</label>
+        <input id="first4" autocomplete="off" placeholder="例: channel_name" />
       </div>
 
       <div class="grid-2">
         <div class="field">
           <label for="firstChatLeft">左コメント</label>
-          <select id="firstChatLeft">
-            <option value="1">①のコメント</option>
-            <option value="2">②のコメント</option>
-            <option value="3">③のコメント</option>
-          </select>
+          <select id="firstChatLeft"></select>
         </div>
         <div class="field">
           <label for="firstChatRight">右コメント</label>
-          <select id="firstChatRight">
-            <option value="1">①のコメント</option>
-            <option value="2" selected>②のコメント</option>
-            <option value="3">③のコメント</option>
-          </select>
+          <select id="firstChatRight"></select>
         </div>
       </div>
 
@@ -407,32 +441,34 @@
     (() => {
       'use strict';
 
+      // v2の保存データも同じキーで自動移行する
       const STORAGE_KEY = 'twitchVerticalView.config.v1';
       const $ = (id) => document.getElementById(id);
-      const tileIds = ['videoTile1', 'videoTile2', 'videoTile3'];
-      const videoHostIds = ['video1', 'video2', 'video3'];
-      const positionClasses = ['pos-main', 'pos-left', 'pos-right'];
-      const circled = ['①', '②', '③'];
+      const tileIds = ['videoTile1', 'videoTile2', 'videoTile3', 'videoTile4'];
+      const videoHostIds = ['video1', 'video2', 'video3', 'video4'];
+      const circled = ['①', '②', '③', '④'];
 
       const defaultConfig = {
-        channels: ['', '', ''],
+        streamCount: 3,
+        channels: ['', '', '', ''],
         chatLeft: '1',
         chatRight: '2',
-        // channels[i] の映像がどの位置にいるか: 0=上、1=左下、2=右下
-        positions: [0, 1, 2]
+        // 表示位置の順番。先頭がメイン。
+        order: [0, 1, 2, 3]
       };
 
       let config = loadConfig();
-      const renderedVideoChannels = ['', '', ''];
+      const renderedVideoChannels = ['', '', '', ''];
       const renderedChatChannels = { left: null, right: null };
       const runningAnimations = new Map();
 
       function cloneDefaultConfig() {
         return {
+          streamCount: defaultConfig.streamCount,
           channels: [...defaultConfig.channels],
           chatLeft: defaultConfig.chatLeft,
           chatRight: defaultConfig.chatRight,
-          positions: [...defaultConfig.positions]
+          order: [...defaultConfig.order]
         };
       }
 
@@ -445,8 +481,7 @@
           if (/^https?:\/\//i.test(v)) {
             const url = new URL(v);
             if (/(^|\.)twitch\.tv$/i.test(url.hostname)) {
-              const firstPath = url.pathname.split('/').filter(Boolean)[0] || '';
-              v = firstPath;
+              v = url.pathname.split('/').filter(Boolean)[0] || '';
             }
           }
         } catch (_) {}
@@ -455,21 +490,67 @@
         return /^[a-z0-9_]{2,25}$/i.test(v) ? v : '';
       }
 
-      function normalizePositions(value) {
-        if (!Array.isArray(value)) return [0, 1, 2];
-        const p = value.map(Number);
-        return p.length === 3 && [...p].sort().join(',') === '0,1,2' ? p : [0, 1, 2];
+      function normalizeCount(value, fallback = 3) {
+        const count = Number(value);
+        return [2, 3, 4].includes(count) ? count : fallback;
+      }
+
+      function isPermutation(values, size) {
+        return Array.isArray(values)
+          && values.length === size
+          && [...values].map(Number).sort((a, b) => a - b).join(',') === Array.from({ length: size }, (_, i) => i).join(',');
+      }
+
+      function migrateOrder(saved) {
+        if (isPermutation(saved?.order, 4)) return saved.order.map(Number);
+
+        // v2の positions: channelIndex -> position を order に変換
+        if (Array.isArray(saved?.positions) && saved.positions.length >= 2) {
+          const oldSize = Math.min(4, saved.positions.length);
+          const oldIndices = Array.from({ length: oldSize }, (_, i) => i);
+          const positions = saved.positions.slice(0, oldSize).map(Number);
+          if (isPermutation(positions, oldSize)) {
+            const migrated = oldIndices.sort((a, b) => positions[a] - positions[b]);
+            for (let i = 0; i < 4; i += 1) {
+              if (!migrated.includes(i)) migrated.push(i);
+            }
+            return migrated;
+          }
+        }
+        return [0, 1, 2, 3];
+      }
+
+      function normalizeOrder(order, streamCount) {
+        const base = isPermutation(order, 4) ? order.map(Number) : [0, 1, 2, 3];
+        const active = base.filter(index => index < streamCount);
+        for (let i = 0; i < streamCount; i += 1) {
+          if (!active.includes(i)) active.push(i);
+        }
+        const inactive = Array.from({ length: 4 - streamCount }, (_, i) => i + streamCount);
+        return [...active, ...inactive];
+      }
+
+      function normalizeChat(value, streamCount, fallback) {
+        const candidate = String(value);
+        return Number(candidate) >= 1 && Number(candidate) <= streamCount ? candidate : String(fallback);
       }
 
       function loadConfig() {
         try {
           const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
           if (!saved || !Array.isArray(saved.channels)) return cloneDefaultConfig();
+
+          const inferred = saved.channels.length >= 4 && saved.channels[3] ? 4 : 3;
+          const streamCount = normalizeCount(saved.streamCount, inferred);
+          const channels = [0, 1, 2, 3].map(i => normalizeChannel(saved.channels[i]));
+          const order = normalizeOrder(migrateOrder(saved), streamCount);
+
           return {
-            channels: [0, 1, 2].map(i => normalizeChannel(saved.channels[i])),
-            chatLeft: ['1','2','3'].includes(String(saved.chatLeft)) ? String(saved.chatLeft) : '1',
-            chatRight: ['1','2','3'].includes(String(saved.chatRight)) ? String(saved.chatRight) : '2',
-            positions: normalizePositions(saved.positions)
+            streamCount,
+            channels,
+            chatLeft: normalizeChat(saved.chatLeft, streamCount, 1),
+            chatRight: normalizeChat(saved.chatRight, streamCount, Math.min(2, streamCount)),
+            order
           };
         } catch (_) {
           return cloneDefaultConfig();
@@ -480,13 +561,8 @@
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       }
 
-      function parentHost() {
-        return location.hostname;
-      }
-
-      function canEmbedHere() {
-        return location.protocol === 'https:' && Boolean(parentHost());
-      }
+      function parentHost() { return location.hostname; }
+      function canEmbedHere() { return location.protocol === 'https:' && Boolean(parentHost()); }
 
       function videoUrl(channel, muted) {
         const p = new URLSearchParams({
@@ -522,9 +598,20 @@
         container.appendChild(div);
       }
 
+      function activeIndices() {
+        return config.order.filter(index => index < config.streamCount);
+      }
+
       function renderVideo(index, force = false) {
         const container = $(videoHostIds[index]);
-        const channel = config.channels[index];
+        const isActive = index < config.streamCount;
+        const channel = isActive ? config.channels[index] : '';
+
+        if (!isActive) {
+          renderedVideoChannels[index] = '';
+          container.replaceChildren();
+          return;
+        }
 
         // 同じチャンネルなら iframe に触らない = 再読み込みしない
         if (!force && renderedVideoChannels[index] === channel && container.firstChild) return;
@@ -534,7 +621,7 @@
         if (!channel) return setEmpty(container, `Twitch ${circled[index]} が未設定です`);
         if (!canEmbedHere()) return setEmpty(container, 'GitHub Pages（HTTPS）で開くとTwitchが表示されます');
 
-        // 初回ロード時のみ ①は音声あり、②③はミュート
+        // 初回ロード時のみ①は音声あり、それ以外はミュート
         container.appendChild(makeIframe(
           videoUrl(channel, index !== 0),
           `Twitch ${circled[index]}: ${channel}`,
@@ -543,14 +630,15 @@
       }
 
       function renderVideos(force = false) {
-        [0, 1, 2].forEach(i => renderVideo(i, force));
+        [0, 1, 2, 3].forEach(i => renderVideo(i, force));
       }
 
       function renderChat(side, force = false) {
         const isLeft = side === 'left';
         const container = $(isLeft ? 'chatLeft' : 'chatRight');
         const selected = isLeft ? config.chatLeft : config.chatRight;
-        const channel = config.channels[Number(selected) - 1];
+        const channelIndex = Number(selected) - 1;
+        const channel = channelIndex < config.streamCount ? config.channels[channelIndex] : '';
         const sideName = isLeft ? '左' : '右';
 
         if (!force && renderedChatChannels[side] === channel && container.firstChild) return;
@@ -567,8 +655,28 @@
         renderChat('right', force);
       }
 
-      function updatePromoteButtons() {
-        const mainChannelIndex = config.positions.indexOf(0);
+      function layoutForPosition(position) {
+        if (position === 0) return { column: '1 / -1', row: '1' };
+        if (config.streamCount === 2) return { column: '1 / -1', row: '2' };
+        if (position === 1) return { column: '1', row: '2' };
+        if (position === 2) return { column: '2', row: '2' };
+        return { column: '1 / -1', row: '3' };
+      }
+
+      function updateMainButtons() {
+        const mainChannelIndex = activeIndices()[0];
+
+        document.querySelectorAll('[data-main]').forEach((button) => {
+          const index = Number(button.dataset.main);
+          const active = index < config.streamCount;
+          const isMain = active && index === mainChannelIndex;
+          button.hidden = !active;
+          button.classList.toggle('is-main', isMain);
+          button.disabled = isMain;
+          button.textContent = `${circled[index]}メイン`;
+          button.title = isMain ? `${circled[index]} は現在メインです` : `${circled[index]} をメインにする`;
+        });
+
         document.querySelectorAll('[data-promote]').forEach((button) => {
           const index = Number(button.dataset.promote);
           const isMain = index === mainChannelIndex;
@@ -580,36 +688,50 @@
       }
 
       function applyPositions() {
-        [0, 1, 2].forEach((channelIndex) => {
+        const grid = $('videoGrid');
+        grid.className = `video-grid count-${config.streamCount}`;
+        $('layout').style.gridTemplateRows = config.streamCount === 4 ? '74fr 26fr' : '69fr 31fr';
+
+        const active = activeIndices();
+        [0, 1, 2, 3].forEach((channelIndex) => {
           const tile = $(tileIds[channelIndex]);
-          tile.classList.remove(...positionClasses);
-          tile.classList.add(positionClasses[config.positions[channelIndex]]);
+          const position = active.indexOf(channelIndex);
+          const isActive = position !== -1;
+          tile.hidden = !isActive;
+          if (!isActive) return;
+
+          const placement = layoutForPosition(position);
+          tile.style.gridColumn = placement.column;
+          tile.style.gridRow = placement.row;
         });
-        updatePromoteButtons();
+
+        updateMainButtons();
       }
 
       function tileRects() {
-        return tileIds.map(id => $(id).getBoundingClientRect());
+        return tileIds.map((id) => {
+          const tile = $(id);
+          return tile.hidden ? null : tile.getBoundingClientRect();
+        });
       }
 
       function animatePositionChange(mutator) {
         const before = tileRects();
-
         mutator();
         applyPositions();
-
-        // 新しいグリッド位置を確定させてから FLIP アニメーション
         const after = tileRects();
         const grid = $('videoGrid');
         grid.classList.add('is-animating');
 
-        let longest = Promise.resolve();
+        const finishedList = [];
         tileIds.forEach((id, index) => {
           const tile = $(id);
-          runningAnimations.get(tile)?.cancel();
-
           const b = before[index];
           const a = after[index];
+          if (!b || !a) return;
+
+          runningAnimations.get(tile)?.cancel();
+
           const dx = b.left - a.left;
           const dy = b.top - a.top;
           const sx = a.width ? b.width / a.width : 1;
@@ -634,31 +756,27 @@
           });
 
           runningAnimations.set(tile, animation);
-          const finished = animation.finished.catch(() => {}).finally(() => {
+          finishedList.push(animation.finished.catch(() => {}).finally(() => {
             if (runningAnimations.get(tile) === animation) runningAnimations.delete(tile);
             tile.style.zIndex = '';
-          });
-          longest = Promise.all([longest, finished]);
+          }));
         });
 
-        longest.finally(() => grid.classList.remove('is-animating'));
-      }
-
-      function swapPositions(channelA, channelB) {
-        if (channelA === channelB) return;
-        animatePositionChange(() => {
-          [config.positions[channelA], config.positions[channelB]] = [
-            config.positions[channelB],
-            config.positions[channelA]
-          ];
-          saveConfig();
-        });
+        Promise.all(finishedList).finally(() => grid.classList.remove('is-animating'));
       }
 
       function promoteToMain(channelIndex) {
-        const currentMain = config.positions.indexOf(0);
+        if (channelIndex >= config.streamCount) return;
+        const active = activeIndices();
+        const currentMain = active[0];
         if (currentMain === channelIndex) return;
-        swapPositions(currentMain, channelIndex);
+
+        animatePositionChange(() => {
+          const a = config.order.indexOf(currentMain);
+          const b = config.order.indexOf(channelIndex);
+          [config.order[a], config.order[b]] = [config.order[b], config.order[a]];
+          saveConfig();
+        });
       }
 
       function renderAll({ forceVideos = false, forceChats = false } = {}) {
@@ -669,24 +787,55 @@
         updateSizeWarning();
       }
 
+      function fillChatOptions(select, count, selectedValue, fallback = 1) {
+        const safeSelected = normalizeChat(selectedValue, count, fallback);
+        select.replaceChildren();
+        for (let i = 1; i <= count; i += 1) {
+          const option = document.createElement('option');
+          option.value = String(i);
+          option.textContent = `${circled[i - 1]}のコメント`;
+          option.selected = String(i) === safeSelected;
+          select.appendChild(option);
+        }
+      }
+
+      function updateChannelFieldVisibility(prefix, count) {
+        const selector = prefix === 'first' ? '[data-first-channel-field]' : '[data-channel-field]';
+        document.querySelectorAll(selector).forEach((field) => {
+          const index = Number(prefix === 'first' ? field.dataset.firstChannelField : field.dataset.channelField);
+          field.hidden = index >= count;
+        });
+      }
+
+      function updateDrawerCountUI(count) {
+        updateChannelFieldVisibility('drawer', count);
+        fillChatOptions($('chatLeftSelect'), count, $('chatLeftSelect').value || config.chatLeft, 1);
+        fillChatOptions($('chatRightSelect'), count, $('chatRightSelect').value || config.chatRight, Math.min(2, count));
+      }
+
+      function updateFirstCountUI(count) {
+        updateChannelFieldVisibility('first', count);
+        fillChatOptions($('firstChatLeft'), count, $('firstChatLeft').value || '1', 1);
+        fillChatOptions($('firstChatRight'), count, $('firstChatRight').value || String(Math.min(2, count)), Math.min(2, count));
+      }
+
       function syncForm() {
-        $('channel1').value = config.channels[0];
-        $('channel2').value = config.channels[1];
-        $('channel3').value = config.channels[2];
+        $('streamCount').value = String(config.streamCount);
+        [0, 1, 2, 3].forEach(i => { $(`channel${i + 1}`).value = config.channels[i]; });
+        updateDrawerCountUI(config.streamCount);
         $('chatLeftSelect').value = config.chatLeft;
         $('chatRightSelect').value = config.chatRight;
       }
 
       function readDrawerConfig() {
+        const streamCount = normalizeCount($('streamCount').value);
+        const channels = [0, 1, 2, 3].map(i => normalizeChannel($(`channel${i + 1}`).value));
         return {
-          channels: [
-            normalizeChannel($('channel1').value),
-            normalizeChannel($('channel2').value),
-            normalizeChannel($('channel3').value)
-          ],
-          chatLeft: $('chatLeftSelect').value,
-          chatRight: $('chatRightSelect').value,
-          positions: [...config.positions]
+          streamCount,
+          channels,
+          chatLeft: normalizeChat($('chatLeftSelect').value, streamCount, 1),
+          chatRight: normalizeChat($('chatRightSelect').value, streamCount, Math.min(2, streamCount)),
+          order: normalizeOrder(config.order, streamCount)
         };
       }
 
@@ -704,8 +853,10 @@
       }
 
       function updateSizeWarning() {
-        const text = window.innerWidth < 804
-          ? `現在の幅は ${window.innerWidth}px。Twitch動画は1枠あたり最低400px幅が必要なため、②③の横並びは幅804px以上を推奨します。`
+        // 4人配置は横2列なので、縦モニターでも各小窓の幅を確保しやすい
+        const recommended = config.streamCount >= 3 ? 804 : 400;
+        const text = window.innerWidth < recommended
+          ? `現在の幅は ${window.innerWidth}px。${config.streamCount}人表示は幅${recommended}px以上を推奨します。`
           : '';
         $('widthWarning').textContent = text;
         $('sizeBadge').textContent = text;
@@ -713,12 +864,24 @@
       }
 
       function showFirstRunIfNeeded() {
-        if (!config.channels.some(Boolean)) $('firstRun').classList.add('open');
+        if (!config.channels.slice(0, config.streamCount).some(Boolean)) {
+          $('firstStreamCount').value = String(config.streamCount);
+          updateFirstCountUI(config.streamCount);
+          $('firstRun').classList.add('open');
+        }
       }
 
       $('settingsBtn').addEventListener('click', openDrawer);
       $('closeDrawer').addEventListener('click', closeDrawer);
       $('drawerBackdrop').addEventListener('click', closeDrawer);
+
+      $('streamCount').addEventListener('change', () => {
+        updateDrawerCountUI(normalizeCount($('streamCount').value));
+      });
+
+      $('firstStreamCount').addEventListener('change', () => {
+        updateFirstCountUI(normalizeCount($('firstStreamCount').value));
+      });
 
       $('applyBtn').addEventListener('click', () => {
         const previous = config;
@@ -726,10 +889,13 @@
         config = next;
         saveConfig();
 
-        // 変更された映像・コメントだけ作り直す。位置は維持。
-        [0, 1, 2].forEach((i) => {
-          if (previous.channels[i] !== next.channels[i]) renderVideo(i, true);
+        // 人数変更・チャンネル変更があった枠だけ再構築。位置切替だけなら再読み込みしない。
+        [0, 1, 2, 3].forEach((i) => {
+          const activeChanged = (i < previous.streamCount) !== (i < next.streamCount);
+          const channelChanged = previous.channels[i] !== next.channels[i];
+          if (activeChanged || channelChanged) renderVideo(i, true);
         });
+
         renderChats(true);
         applyPositions();
         syncForm();
@@ -746,11 +912,14 @@
         renderedChatChannels.right = null;
         renderAll({ forceVideos: true, forceChats: true });
         closeDrawer();
+        $('firstStreamCount').value = '3';
+        updateFirstCountUI(3);
         $('firstRun').classList.add('open');
       });
 
-      $('swap12').addEventListener('click', () => swapPositions(0, 1));
-      $('swap13').addEventListener('click', () => swapPositions(0, 2));
+      document.querySelectorAll('[data-main]').forEach((button) => {
+        button.addEventListener('click', () => promoteToMain(Number(button.dataset.main)));
+      });
 
       document.querySelectorAll('[data-promote]').forEach((button) => {
         button.addEventListener('click', () => promoteToMain(Number(button.dataset.promote)));
@@ -771,22 +940,21 @@
       });
 
       $('startBtn').addEventListener('click', () => {
-        const channels = [
-          normalizeChannel($('first1').value),
-          normalizeChannel($('first2').value),
-          normalizeChannel($('first3').value)
-        ];
+        const streamCount = normalizeCount($('firstStreamCount').value);
+        const channels = [0, 1, 2, 3].map(i => normalizeChannel($(`first${i + 1}`).value));
+        const activeChannels = channels.slice(0, streamCount);
 
-        if (!channels.every(Boolean)) {
-          $('firstError').textContent = '3つとも有効なTwitchチャンネル名またはURLを入力してください。';
+        if (!activeChannels.every(Boolean)) {
+          $('firstError').textContent = `${streamCount}人分すべて、有効なTwitchチャンネル名またはURLを入力してください。`;
           return;
         }
 
         config = {
+          streamCount,
           channels,
-          chatLeft: $('firstChatLeft').value,
-          chatRight: $('firstChatRight').value,
-          positions: [0, 1, 2]
+          chatLeft: normalizeChat($('firstChatLeft').value, streamCount, 1),
+          chatRight: normalizeChat($('firstChatRight').value, streamCount, Math.min(2, streamCount)),
+          order: [0, 1, 2, 3]
         };
         saveConfig();
         $('firstError').textContent = '';
@@ -800,6 +968,7 @@
         if (event.key.toLowerCase() === 's' && !/input|select|textarea/i.test(document.activeElement?.tagName || '')) openDrawer();
       });
 
+      updateFirstCountUI(3);
       renderAll();
       showFirstRunIfNeeded();
     })();
